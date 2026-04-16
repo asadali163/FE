@@ -15,7 +15,7 @@ import pandas as pd
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 EVENTS_CSV = "events.csv"
-SELL_DATA = "./data/France/processed_data/combined_df.csv"
+SELL_DATA = "combined_df.csv"
 FUTURE_CSV = "future_events.csv"
 MAX_MAP_MARKERS = 200
 
