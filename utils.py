@@ -15,6 +15,7 @@ import pandas as pd
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 EVENTS_CSV = "events.csv"
+SELL_DATA = "./data/France/processed_data/combined_df.csv"
 FUTURE_CSV = "future_events.csv"
 MAX_MAP_MARKERS = 200
 
@@ -66,6 +67,22 @@ FUTURE_CSV_COLS = [
     "capacity_range_max",
     "capacity_confidence",
 ]
+
+
+# -- Data Loader Sell
+@st.cache_data
+def load_sell_data():
+    try:
+        df = pd.read_csv(SELL_DATA, low_memory=False)
+        df = wrangle(df)
+        df_sellin = df[df["data_type"] == "sell_in"].copy()
+        df_sellout = df[df["data_type"] == "sell_out"].copy()
+        return df_sellin, df_sellout
+    except FileNotFoundError:
+        st.error(
+            f"❌ Could not find `{SELL_DATA}`. Make sure it is in the same folder as `app.py`."
+        )
+        return pd.DataFrame()
 
 
 # ── Data Loader ───────────────────────────────────────────────────────────────
@@ -267,3 +284,35 @@ def display_results(df_events: pd.DataFrame, lat: float, lon: float):
     ]
     display_cols = [c for c in display_cols if c in df_events.columns]
     st.dataframe(df_events[display_cols], use_container_width=True)
+
+
+def wrangle(df: pd.DataFrame) -> pd.DataFrame:
+    df.rename(
+        columns={
+            "data_type": "data_type",
+            "source": "provider",
+            "Sales Date": "date",
+            "Outlet SF ID": "customer_code",
+            "Store Participant Code": "customer_name",
+            "SKU SF ID": "sku_code",
+            "SKU Name": "sku_name",
+            "Brand Variant": "brand_variant",
+            "Brand Family": "brand_name",
+            "Category": "category",
+            "Volume in Unit": "sales_amount",
+            "Volume in Packs": "sales_quantity",
+            "Ownership Type": "channel_name",
+            "Latitude": "latitude",
+            "Longitude": "longitude",
+            "Territory Id": "route",
+            # Extra
+            "Brand": "brand",
+            "SKU Clean": "sku_clean",
+            "Month": "month",
+        },
+        inplace=True,
+    )
+
+    df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
+
+    return df
