@@ -5,17 +5,26 @@ Shared constants, data loaders, and map/display helpers
 used across all tabs.
 """
 
-import csv
 import os
+import gdown
 import streamlit as st
 import folium
 from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
 import pandas as pd
 
+
+# Prophet says non zero and actual is zero (Called stock out)
+# Sellin se 3 din pehle.
+# Gir ke oth gaye ha to stock out nahi ha, agar na to stock out ha (Between sellin cycle)
+
+# Any date between fullfilment cycle if trend is declining, (It means possible stock out)
+# And when fullfillment (next) happen, the sale increase again. (It means )
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 EVENTS_CSV = "events.csv"
-SELL_DATA = "combined_df.csv"
+# SELL_DATA = "./data/France/processed_data/combined_df.csv"
+SELL_DATA = "https://drive.google.com/uc?id=1xaIwIYiSHOS8cZfp_7DVW5AQHMvyEV1q"
 FUTURE_CSV = "future_events.csv"
 MAX_MAP_MARKERS = 200
 
@@ -73,16 +82,40 @@ FUTURE_CSV_COLS = [
 @st.cache_data
 def load_sell_data():
     try:
-        df = pd.read_csv(SELL_DATA, low_memory=False)
+        url = "https://drive.google.com/uc?id=1xaIwIYiSHOS8cZfp_7DVW5AQHMvyEV1q"
+        output = "data.csv"
+
+        # Download only if not already present
+        if not os.path.exists(output):
+            gdown.download(url, output, quiet=False)
+
+        df = pd.read_csv(output, low_memory=False)
+
         df = wrangle(df)
+
         df_sellin = df[df["data_type"] == "sell_in"].copy()
         df_sellout = df[df["data_type"] == "sell_out"].copy()
+
         return df_sellin, df_sellout
-    except FileNotFoundError:
-        st.error(
-            f"❌ Could not find `{SELL_DATA}`. Make sure it is in the same folder as `app.py`."
-        )
-        return pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"❌ Error loading data: {e}")
+        return pd.DataFrame(), pd.DataFrame()
+
+
+# @st.cache_data
+# def load_sell_data():
+#     try:
+#         df = pd.read_csv(SELL_DATA, low_memory=False)
+#         df = wrangle(df)
+#         df_sellin = df[df["data_type"] == "sell_in"].copy()
+#         df_sellout = df[df["data_type"] == "sell_out"].copy()
+#         return df_sellin, df_sellout
+#     except FileNotFoundError:
+#         st.error(
+#             f"❌ Could not find `{SELL_DATA}`. Make sure it is in the same folder as `app.py`."
+#         )
+#         return pd.DataFrame()
 
 
 # ── Data Loader ───────────────────────────────────────────────────────────────

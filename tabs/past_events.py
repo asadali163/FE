@@ -27,7 +27,7 @@ def render():
         .reset_index(drop=True)
     )
     unique_shops["label"] = unique_shops.apply(
-        lambda r: f"({r['shop_lat']}, {r['shop_lon']})", axis=1
+        lambda r: f"({r['shop_lat']:.6f}, {r['shop_lon']:.6f})", axis=1
     )
 
     selected_label = st.selectbox(

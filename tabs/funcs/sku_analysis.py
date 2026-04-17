@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 
 
 def fig_stock_remaining(
-    sellin, sellout, customer_code, sku_code, take_from_first_si=False
+    sellin, sellout, customer_code, sku_code, percentage, take_from_first_si=False
 ):
 
     print(f"customer_code: {customer_code}, sku_code: {sku_code}")
@@ -19,7 +19,6 @@ def fig_stock_remaining(
     # Filter customer data
     # -----------------------------
     df_sellin = sellin[(sellin["customer_code"] == customer_code)].copy()
-
     df_sellout = sellout[(sellout["customer_code"] == customer_code)].copy()
 
     # -----------------------------
@@ -62,9 +61,24 @@ def fig_stock_remaining(
     final_temp.fillna(0, inplace=True)
 
     # -----------------------------
-    # Sort BEFORE cumulative sum (important)
+    # Sort BEFORE logic
     # -----------------------------
     final_temp = final_temp.sort_index()
+
+    # -----------------------------
+    # 🔥 ADD INITIAL STOCK LOGIC
+    # -----------------------------
+    # Find first fulfillment (sell-in > 0)
+    first_si_idx = final_temp[final_temp["sales_quantity_sellin"] > 0].index
+
+    if len(first_si_idx) > 0:
+        first_date = first_si_idx[0]
+        first_value = final_temp.loc[first_date, "sales_quantity_sellin"]
+
+        extra_stock = percentage * first_value
+
+        # Add to first fulfillment
+        final_temp.loc[first_date, "sales_quantity_sellin"] += extra_stock
 
     # -----------------------------
     # Stock remaining (cumulative)

@@ -47,17 +47,39 @@ def _render_sku_analysis(sellin: pd.DataFrame, sellout: pd.DataFrame):
     if not customer or not sku:
         st.warning("Please select a customer and SKU.")
         return
+    else:
+        # Write lat and long for given customer as caption
+        customer_lat = sellout[sellout["customer_code"] == customer]["latitude"].iloc[0]
+        customer_lon = sellout[sellout["customer_code"] == customer]["longitude"].iloc[
+            0
+        ]
+
+        st.caption(f"Lat: {customer_lat:.6f} | Lon: {customer_lon:.6f}")
 
     st.markdown("---")
 
-    ## Include checkbox for "Take from first sell-in"
-    take_from_first_si = st.checkbox("Take from first sell-in", value=True)
+    col1, col2 = st.columns(2)
+
+    with col1:
+        take_from_first_si = st.checkbox("Take from first sell-in", value=True)
+
+    with col2:
+        percentage = st.slider(
+            "Percentage",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.0,
+            step=0.01,
+        )
+
+    # ── Row 1 — Stock Remaining ──────────────────────────
 
     fig11 = sku_analysis.fig_stock_remaining(
         sellin.copy(),
         sellout.copy(),
         customer,
         sku,
+        percentage=percentage,
         take_from_first_si=take_from_first_si,
     )
     st.plotly_chart(fig11, use_container_width=True)
