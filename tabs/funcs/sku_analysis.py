@@ -307,13 +307,13 @@ def fig_monthly(
     # Monthly aggregation
     # -----------------------------
     monthly_si = (
-        si["sales_quantity"].resample("M").sum()
+        si["sales_quantity"].resample("ME").sum()
         if not si.empty
         else pd.Series(dtype=float)
     )
 
     monthly_so = (
-        so["sales_quantity"].resample("M").sum()
+        so["sales_quantity"].resample("ME").sum()
         if not so.empty
         else pd.Series(dtype=float)
     )
