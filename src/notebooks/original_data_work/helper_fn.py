@@ -129,7 +129,14 @@ def load_data(df_path):
     df["date"] = pd.to_datetime(df["date"])
 
     df_sellin = df[df["data_type"] == "sell_in"].copy()
-    df_sellout = df[df["data_type"] == "sell_out"].copy()
+    # df_sellout = df[df["data_type"] == "sell_out"].copy()
+    df_sellout = sell_out = df[
+        (df["data_type"] == "sell_out")
+        & (df["sku_code"].astype(str).str.strip() != "0")
+    ].copy()
+
+    # Replace NaN category with FMC.
+    # df_sellout["category"] = df_sellout["category"].fillna("FMC")
 
     return df_sellin, df_sellout
 

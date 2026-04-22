@@ -22,11 +22,14 @@ import pandas as pd
 # And when fullfillment (next) happen, the sale increase again. (It means )
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-EVENTS_CSV = "events.csv"
-# SELL_DATA = "./data/France/processed_data/combined_df.csv"
-SELL_DATA = "https://drive.google.com/uc?id=1xaIwIYiSHOS8cZfp_7DVW5AQHMvyEV1q"
+EVENTS_CSV = "eve.csv"
+SELL_DATA = "./data/France/processed_data/combined_df.csv"
+# SELL_DATA = "https://drive.google.com/uc?id=1xaIwIYiSHOS8cZfp_7DVW5AQHMvyEV1q"
 FUTURE_CSV = "future_events.csv"
 MAX_MAP_MARKERS = 200
+
+SELECTED_SHOP_LAT = 0
+SELECTED_SHOP_LONG = 0
 
 SOURCE_COLORS = {
     "Ticketmaster": "red",
@@ -79,43 +82,49 @@ FUTURE_CSV_COLS = [
 
 
 # -- Data Loader Sell
-@st.cache_data
-def load_sell_data():
-    try:
-        url = "https://drive.google.com/uc?id=1xaIwIYiSHOS8cZfp_7DVW5AQHMvyEV1q"
-        output = "data.csv"
-
-        # Download only if not already present
-        if not os.path.exists(output):
-            gdown.download(url, output, quiet=False)
-
-        df = pd.read_csv(output, low_memory=False)
-
-        df = wrangle(df)
-
-        df_sellin = df[df["data_type"] == "sell_in"].copy()
-        df_sellout = df[df["data_type"] == "sell_out"].copy()
-
-        return df_sellin, df_sellout
-
-    except Exception as e:
-        st.error(f"❌ Error loading data: {e}")
-        return pd.DataFrame(), pd.DataFrame()
-
-
-# @st.cache_data
+# @st.cache_data  # Load sell data for dashboard
 # def load_sell_data():
 #     try:
-#         df = pd.read_csv(SELL_DATA, low_memory=False)
+#         url = "https://drive.google.com/uc?id=1xaIwIYiSHOS8cZfp_7DVW5AQHMvyEV1q"
+#         output = "data.csv"
+
+#         # Download only if not already present
+#         if not os.path.exists(output):
+#             gdown.download(url, output, quiet=False)
+
+#         df = pd.read_csv(output, low_memory=False)
+
 #         df = wrangle(df)
+
 #         df_sellin = df[df["data_type"] == "sell_in"].copy()
-#         df_sellout = df[df["data_type"] == "sell_out"].copy()
+#         df_sellout = sell_out = df[
+#             (df["data_type"] == "sell_out")
+#             & (df["sku_code"].astype(str).str.strip() != "0")
+#         ].copy()
+
 #         return df_sellin, df_sellout
-#     except FileNotFoundError:
-#         st.error(
-#             f"❌ Could not find `{SELL_DATA}`. Make sure it is in the same folder as `app.py`."
-#         )
-#         return pd.DataFrame()
+
+#     except Exception as e:
+#         st.error(f"❌ Error loading data: {e}")
+#         return pd.DataFrame(), pd.DataFrame()
+
+
+@st.cache_data  # Load sell data locally.
+def load_sell_data():
+    try:
+        df = pd.read_csv(SELL_DATA, low_memory=False)
+        df = wrangle(df)
+        df_sellin = df[df["data_type"] == "sell_in"].copy()
+        df_sellout = sell_out = df[
+            (df["data_type"] == "sell_out")
+            & (df["sku_code"].astype(str).str.strip() != "0")
+        ].copy()
+        return df_sellin, df_sellout
+    except FileNotFoundError:
+        st.error(
+            f"❌ Could not find `{SELL_DATA}`. Make sure it is in the same folder as `app.py`."
+        )
+        return pd.DataFrame()
 
 
 # ── Data Loader ───────────────────────────────────────────────────────────────
@@ -129,6 +138,7 @@ def load_past_data() -> pd.DataFrame:
         df["venue_lat"] = pd.to_numeric(df["venue_lat"], errors="coerce")
         df["venue_lon"] = pd.to_numeric(df["venue_lon"], errors="coerce")
         df = df.dropna(subset=["shop_lat", "shop_lon"])
+        df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
         return df
     except FileNotFoundError:
         st.error(
@@ -203,7 +213,7 @@ def build_map(
         except (ValueError, TypeError):
             cap_range_str = "N/A"
 
-        dist_m = event.get("distance_m", "")
+        dist_m = event.get("distance", "")
         dist_str = (
             f"{int(dist_m)} m"
             if pd.notna(dist_m) and str(dist_m).strip() not in ("", "nan")
@@ -236,7 +246,7 @@ def build_map(
         <div style="font-family: Arial; min-width: 240px; font-size: 13px;">
             <h4 style="margin:0 0 8px 0; color:#333;">{event.get('name', 'Unknown')}</h4>
             <b>📅 Date:</b> {event.get('date', 'N/A')} {event.get('time', '')}<br>
-            <b>🏟️ Venue:</b> {event.get('venue', 'N/A')}<br>
+            <b>🏟️ Venue:</b> {event.get('address', 'N/A')}<br>
             <b>🏙️ City:</b> {event.get('city', 'N/A')}<br>
             <b>🎭 Segment:</b> {event.get('segment', 'N/A')} → {event.get('genre', '')}<br>
             <b>📏 Distance:</b> {dist_str}<br>
@@ -246,8 +256,6 @@ def build_map(
             <hr style="margin:6px 0;">
             <b>🏛️ Venue Type:</b> {event.get('venue_type', 'N/A')}<br>
             <b>👥 Est. Capacity:</b> {cap_est_str}<br>
-            <b>📊 Capacity Range:</b> {cap_range_str}<br>
-            <b>🎯 Confidence:</b> {cap_conf}<br>
             {url_html}
         </div>
         """
@@ -285,11 +293,11 @@ def display_results(df_events: pd.DataFrame, lat: float, lon: float):
     st.subheader("📍 Event Map")
     m = build_map(lat, lon, df_events)
     st_folium(m, use_container_width=True, height=500)
-    st.markdown(
-        "🔴 Ticketmaster &nbsp;&nbsp; 🔵 OpenAgenda &nbsp;&nbsp; "
-        "🟢 Google Events &nbsp;&nbsp; ⚫ Your Shop &nbsp;&nbsp; "
-        "⚪ Daily Recurrent &nbsp;&nbsp; 🔘 Weekly Recurrent"
-    )
+    # st.markdown(
+    #     "🔴 Ticketmaster &nbsp;&nbsp; 🔵 OpenAgenda &nbsp;&nbsp; "
+    #     "🟢 Google Events &nbsp;&nbsp; ⚫ Your Shop &nbsp;&nbsp; "
+    #     "⚪ Daily Recurrent &nbsp;&nbsp; 🔘 Weekly Recurrent"
+    # )
 
     st.markdown("---")
     st.subheader("📊 Event Table")
@@ -349,3 +357,7 @@ def wrangle(df: pd.DataFrame) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
 
     return df
+
+
+def get_fmc_only(df: pd.DataFrame) -> pd.DataFrame:
+    return df[df["category"] == "FMC"].copy()

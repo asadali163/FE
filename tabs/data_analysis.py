@@ -6,8 +6,8 @@ Sales Analysis tab — Whole / Customer / SKU level analysis.
 
 import streamlit as st
 import pandas as pd
-from utils import load_sell_data
-from tabs.funcs import sku_analysis
+from utils import load_sell_data, get_fmc_only, load_past_data
+from tabs.funcs import sku_analysis, customer_analysis
 
 
 def _render_sku_analysis(sellin: pd.DataFrame, sellout: pd.DataFrame):
@@ -49,12 +49,21 @@ def _render_sku_analysis(sellin: pd.DataFrame, sellout: pd.DataFrame):
         return
     else:
         # Write lat and long for given customer as caption
-        customer_lat = sellout[sellout["customer_code"] == customer]["latitude"].iloc[0]
-        customer_lon = sellout[sellout["customer_code"] == customer]["longitude"].iloc[
-            0
-        ]
+        c1, c2 = st.columns(2)
 
-        st.caption(f"Lat: {customer_lat:.6f} | Lon: {customer_lon:.6f}")
+        with c1:
+            customer_lat = sellout[sellout["customer_code"] == customer][
+                "latitude"
+            ].iloc[0]
+            customer_lon = sellout[sellout["customer_code"] == customer][
+                "longitude"
+            ].iloc[0]
+
+            st.caption(f"Lat: {customer_lat:.6f} | Lon: {customer_lon:.6f}")
+        with c2:
+            # Write SKU Name.
+            sku_name = sellout[sellout["sku_code"] == sku]["sku_name"].iloc[0]
+            st.caption(f"Name: {sku_name}")
 
     st.markdown("---")
 
@@ -101,10 +110,86 @@ def _render_whole_analysis(sellin: pd.DataFrame, sellout: pd.DataFrame):
     st.info("Coming soon — you can define whole-level analysis functions here.")
 
 
-def _render_customer_analysis(sellin: pd.DataFrame, sellout: pd.DataFrame):
+def _render_customer_analysis(
+    sellin: pd.DataFrame, sellout: pd.DataFrame, events: pd.DataFrame
+):
     """Customer Level Analysis section — placeholder for now."""
     st.markdown("### 👤 Customer Level Analysis")
-    st.info("Coming soon — you can define customer-level analysis functions here.")
+    # st.info("Coming soon — you can define customer-level analysis functions here.")
+    sellin = get_fmc_only(sellin)
+    sellout = get_fmc_only(sellout)
+
+    customers_all = (
+        sellout.groupby("customer_code")["sales_quantity"]
+        .sum()
+        .sort_values(ascending=False)
+        .index.tolist()
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        customer = st.selectbox("Customer Code", customers_all, key="customer_code")
+
+    threshold = 1.5
+
+    selected_customers = [
+        "0011t000011b2KEAAY",
+        "0011t000011b4TNAAY",
+        "0011t000011b2XFAAY",
+        "0011t000011bAopAAE",
+        "0011t000011b5rGAAQ",
+    ]
+    with col2:
+        customer = st.selectbox(
+            "Spiked Customer Code", selected_customers, key="customer_code_selected"
+        )
+    # with col2:
+    #     threshold = st.slider(
+    #         "Threshold",
+    #         min_value=0.0,
+    #         max_value=5.0,
+    #         value=2.0,
+    #         step=0.5,
+    #     )
+
+    # Write caption with sellout_selected lat and long.
+    customer_lat = sellout[sellout["customer_code"] == customer]["latitude"].iloc[0]
+    customer_lon = sellout[sellout["customer_code"] == customer]["longitude"].iloc[0]
+
+    st.session_state["selected_shop_lat"] = customer_lat
+    st.session_state["selected_shop_lon"] = customer_lon
+
+    st.caption(f"({customer_lat:.6f}, {customer_lon:.6f})")
+
+    df_selected_sellin = sellin[sellin["customer_code"] == customer].copy()
+    df_selected_sellout = sellout[sellout["customer_code"] == customer].copy()
+
+    # Group by date
+    df_selected_sellin = df_selected_sellin.groupby("date")["sales_quantity"].sum()
+
+    # Create full date range
+    full_range = pd.date_range(
+        start=df_selected_sellin.index.min(),
+        end=df_selected_sellin.index.max(),
+        freq="D",
+    )
+
+    # Reindex and fill missing dates with 0
+    df_selected_sellin = (
+        df_selected_sellin.reindex(full_range, fill_value=0)
+        .rename_axis("date")
+        .reset_index()
+    )
+
+    df_selected = customer_analysis.process_customer(
+        df_selected_sellout, events, threshold
+    )
+
+    # Plot the customer.
+    fig = customer_analysis.plot_customer(df_selected, df_selected_sellin)
+
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def render():
@@ -113,6 +198,8 @@ def render():
 
     # ── Load data ─────────────────────────────────────────
     sellin, sellout = load_sell_data()
+
+    df_events = load_past_data()
 
     print(sellin.shape, sellout.shape)
 
@@ -155,6 +242,6 @@ def render():
     elif level == "whole":
         _render_whole_analysis(sellin, sellout)
     elif level == "customer":
-        _render_customer_analysis(sellin, sellout)
+        _render_customer_analysis(sellin, sellout, df_events)
     elif level == "sku":
         _render_sku_analysis(sellin, sellout)

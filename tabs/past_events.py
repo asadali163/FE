@@ -6,8 +6,13 @@ Past Events tab — loads from events.csv
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 from utils import load_past_data, display_results
+
+
+default_lat = st.session_state.get("selected_shop_lat")
+default_lon = st.session_state.get("selected_shop_lon")
 
 
 def render():
@@ -35,6 +40,26 @@ def render():
         options=unique_shops["label"].tolist(),
         index=0,
     )
+
+    # Filter to selected shop
+    # shop_df = df[(df["shop_lat"] == shop_lat) & (df["shop_lon"] == shop_lon)].copy()
+
+    # Find default index from session state
+    # default_index = 0
+
+    # if default_lat is not None and default_lon is not None:
+    #     match = unique_shops[
+    #         (np.isclose(unique_shops["shop_lat"], default_lat))
+    #         & (np.isclose(unique_shops["shop_lon"], default_lon))
+    #     ]
+    #     if not match.empty:
+    #         default_index = match.index[0]
+
+    # selected_label = st.selectbox(
+    #     "Shop (lat, lon)",
+    #     options=unique_shops["label"].tolist(),
+    #     index=default_index,
+    # )
 
     selected_row = unique_shops[unique_shops["label"] == selected_label].iloc[0]
     shop_lat = selected_row["shop_lat"]
